@@ -5,112 +5,55 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Central antenna/sniffer node -->
+    <!-- Back duplicate photo card (offset, semi-transparent — "the copy") -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M54,44 L54,62"
-        android:strokeWidth="3"
-        android:strokeColor="#FFFFFF"/>
+        android:fillAlpha="0.45"
+        android:pathData="M24,24 L42,24 Q44,24 44,26 L44,42 Q44,44 42,44 L24,44 Q22,44 22,42 L22,26 Q22,24 24,24 Z"/>
+
+    <!-- Front duplicate photo card — "the keeper" -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M54,40 m-4,0 a4,4 0,1 1,8 0 a4,4 0,1 1,-8 0"/>
+        android:pathData="M30,30 L48,30 Q50,30 50,32 L50,48 Q50,50 48,50 L30,50 Q28,50 28,48 L28,32 Q28,30 30,30 Z"/>
+
+    <!-- Inside the front card: mountains -->
+    <path
+        android:fillColor="#00A884"
+        android:pathData="M28,50 L33,43 L38,47 L43,42 L50,48 L50,50 Z"/>
+    <!-- Inside the front card: sun -->
+    <path
+        android:fillColor="#00A884"
+        android:pathData="M44,36 m-2.4,0 a2.4,2.4 0,1 1,4.8 0 a2.4,2.4 0,1 1,-4.8 0"/>
+
+    <!-- Trash can handle -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M48,62 L60,62 L57,68 L51,68 Z"/>
+        android:pathData="M64,52 L78,52 Q79,52 79,53 L79,55 Q79,56 78,56 L64,56 Q63,56 63,55 L63,53 Q63,52 64,52 Z"/>
 
-    <!-- Radio waves left (from left device toward center) -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.8"
-        android:pathData="M38,46 Q42,52 38,58"/>
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.8"
-        android:pathData="M33,42 Q39,52 33,62"/>
-
-    <!-- Radio waves right (from right device toward center) -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.8"
-        android:pathData="M70,46 Q66,52 70,58"/>
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.8"
-        android:pathData="M75,42 Q69,52 75,62"/>
-
-    <!-- Device node top-left -->
+    <!-- Trash can lid -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M28,36 m-3.5,0 a3.5,3.5 0,1 1,7 0 a3.5,3.5 0,1 1,-7 0"/>
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.5"
-        android:pathData="M28,32 L28,28"/>
+        android:pathData="M54,58 L88,58 Q90,58 90,60 L90,62 Q90,64 88,64 L54,64 Q52,64 52,62 L52,60 Q52,58 54,58 Z"/>
 
-    <!-- Device node bottom-left -->
+    <!-- Trash can body (slightly tapered) -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M28,68 m-3.5,0 a3.5,3.5 0,1 1,7 0 a3.5,3.5 0,1 1,-7 0"/>
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.5"
-        android:pathData="M28,72 L28,76"/>
+        android:pathData="M56,66 L86,66 L83,86 Q83,88 81,88 L61,88 Q59,88 59,86 Z"/>
 
-    <!-- Device node top-right -->
+    <!-- Three vertical accent slits on the can (background color, look like cut-outs) -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M80,36 m-3.5,0 a3.5,3.5 0,1 1,7 0 a3.5,3.5 0,1 1,-7 0"/>
+        android:strokeColor="#00A884"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M67,70 L67,84"/>
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.5"
-        android:pathData="M80,32 L80,28"/>
-
-    <!-- Device node bottom-right -->
+        android:strokeColor="#00A884"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M73,70 L73,84"/>
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M80,68 m-3.5,0 a3.5,3.5 0,1 1,7 0 a3.5,3.5 0,1 1,-7 0"/>
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.5"
-        android:pathData="M80,72 L80,76"/>
-
-    <!-- Mesh lines connecting outer nodes (faint) -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#80FFFFFF"
-        android:strokeWidth="0.8"
-        android:pathData="M31,37 L77,37"/>
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#80FFFFFF"
-        android:strokeWidth="0.8"
-        android:pathData="M31,67 L77,67"/>
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#80FFFFFF"
-        android:strokeWidth="0.8"
-        android:pathData="M28,39.5 L28,64.5"/>
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#80FFFFFF"
-        android:strokeWidth="0.8"
-        android:pathData="M80,39.5 L80,64.5"/>
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#80FFFFFF"
-        android:strokeWidth="0.8"
-        android:pathData="M31,38 L77,66"/>
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#80FFFFFF"
-        android:strokeWidth="0.8"
-        android:pathData="M31,66 L77,38"/>
+        android:strokeColor="#00A884"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M79,70 L79,84"/>
 </vector>
