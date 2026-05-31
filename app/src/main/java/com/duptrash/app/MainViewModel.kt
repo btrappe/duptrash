@@ -6,9 +6,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.duptrash.app.data.db.DeletePatternEntity
-import com.duptrash.app.data.delete.DeletionPlanner
-import com.duptrash.app.data.model.DeletionPlan
+import com.duptrash.app.data.delete.KeeperPlanner
 import com.duptrash.app.data.model.DuplicateGroup
+import com.duptrash.app.data.model.KeeperPlan
+import com.duptrash.app.data.prefs.UiPrefs
 import com.duptrash.app.data.scan.DuplicateFinder
 import com.duptrash.app.data.scan.MediaScanner
 import com.duptrash.app.data.scan.ScanProgress
@@ -32,8 +33,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _groups = MutableStateFlow<List<DuplicateGroup>>(emptyList())
     val groups: StateFlow<List<DuplicateGroup>> = _groups.asStateFlow()
 
-    private val _plan = MutableStateFlow<DeletionPlan?>(null)
-    val plan: StateFlow<DeletionPlan?> = _plan.asStateFlow()
+    private val _plan = MutableStateFlow<KeeperPlan?>(null)
+    val plan: StateFlow<KeeperPlan?> = _plan.asStateFlow()
+
+    private val _overrides = MutableStateFlow<Map<String, Long>>(emptyMap())
 
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
@@ -44,6 +47,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             SharingStarted.Eagerly,
             emptyList(),
         )
+
+    val splitRatio: StateFlow<Float> get() = getApplication<DupTrashApp>().uiPrefs.splitRatio
+
+    fun setSplitRatio(value: Float) {
+        getApplication<DupTrashApp>().uiPrefs.setSplitRatio(value)
+    }
 
     fun startScan() {
         if (_busy.value) return
@@ -60,19 +69,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val found = duplicateFinder.find()
                 _groups.value = found
-                recomputePlan(found, patterns.value)
+                _overrides.value = emptyMap()
+                recompute()
             } finally {
                 _busy.value = false
             }
         }
     }
 
-    fun recomputePlan() {
-        recomputePlan(_groups.value, patterns.value)
+    fun setKeeperOverride(md5: String, fileId: Long) {
+        _overrides.value = _overrides.value + (md5 to fileId)
+        recompute()
     }
 
-    private fun recomputePlan(groups: List<DuplicateGroup>, patterns: List<DeletePatternEntity>) {
-        _plan.value = DeletionPlanner.plan(groups, patterns)
+    fun recomputePlan() = recompute()
+
+    private fun recompute() {
+        _plan.value = KeeperPlanner.plan(_groups.value, patterns.value, _overrides.value)
     }
 
     fun addPattern(pattern: String) {
@@ -81,33 +94,33 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val dao = database.deletePatternDao()
             val nextPriority = (patterns.value.maxOfOrNull { it.priority } ?: -1) + 1
             dao.insert(DeletePatternEntity(pattern = pattern, priority = nextPriority, enabled = true))
-            recomputePlan()
+            recompute()
         }
     }
 
     fun updatePattern(p: DeletePatternEntity) {
         viewModelScope.launch {
             database.deletePatternDao().update(p)
-            recomputePlan()
+            recompute()
         }
     }
 
     fun deletePattern(p: DeletePatternEntity) {
         viewModelScope.launch {
             database.deletePatternDao().delete(p)
-            recomputePlan()
+            recompute()
         }
     }
 
     fun onTrashRequestResult(success: Boolean) {
-        if (success) {
-            viewModelScope.launch {
-                val plan = _plan.value ?: return@launch
-                database.mediaFileDao().deleteByIds(plan.toDelete.map { it.id })
-                val remaining = duplicateFinder.find()
-                _groups.value = remaining
-                recomputePlan(remaining, patterns.value)
-            }
+        if (!success) return
+        viewModelScope.launch {
+            val plan = _plan.value ?: return@launch
+            database.mediaFileDao().deleteByIds(plan.toDelete.map { it.id })
+            _overrides.value = emptyMap()
+            val remaining = duplicateFinder.find()
+            _groups.value = remaining
+            recompute()
         }
     }
 

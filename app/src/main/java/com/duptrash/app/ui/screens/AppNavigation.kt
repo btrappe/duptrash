@@ -10,7 +10,7 @@ object Routes {
     const val HOME = "home"
     const val DUPLICATES = "duplicates"
     const val PATTERNS = "patterns"
-    const val REVIEW = "review"
+    const val RANDOM_PICKS = "random-picks"
 }
 
 @Composable
@@ -20,6 +20,6 @@ fun AppNavigation(viewModel: MainViewModel) {
         composable(Routes.HOME) { HomeScreen(viewModel, nav) }
         composable(Routes.DUPLICATES) { DuplicatesScreen(viewModel, nav) }
         composable(Routes.PATTERNS) { PatternsScreen(viewModel, nav) }
-        composable(Routes.REVIEW) { ReviewSkippedScreen(viewModel, nav) }
+        composable(Routes.RANDOM_PICKS) { RandomPicksScreen(viewModel, nav) }
     }
 }
