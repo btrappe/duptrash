@@ -31,6 +31,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +59,7 @@ import com.duptrash.app.ui.humanBytes
 fun RandomPicksScreen(viewModel: MainViewModel, nav: NavController) {
     val plan by viewModel.plan.collectAsState()
     val randomGroups = plan?.groups.orEmpty().filter { it.reason == KeeperReason.RANDOM }
+    var detailsTarget by remember { mutableStateOf<MediaFileEntity?>(null) }
 
     Scaffold(
         topBar = {
@@ -84,37 +88,57 @@ fun RandomPicksScreen(viewModel: MainViewModel, nav: NavController) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(randomGroups, key = { it.md5 }) { group ->
-                RandomPickCard(group) { fileId ->
-                    viewModel.setKeeperOverride(group.md5, fileId)
-                }
+                RandomPickCard(
+                    group = group,
+                    onPick = { fileId -> viewModel.setKeeperOverride(group.md5, fileId) },
+                    onShowDetails = { detailsTarget = it },
+                )
             }
         }
+    }
+
+    detailsTarget?.let { file ->
+        FileDetailsDialog(file = file, onDismiss = { detailsTarget = null })
     }
 }
 
 @Composable
-private fun RandomPickCard(group: KeeperGroup, onPick: (Long) -> Unit) {
+private fun RandomPickCard(
+    group: KeeperGroup,
+    onPick: (Long) -> Unit,
+    onShowDetails: (MediaFileEntity) -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                "${group.victims.size + 1} copies · ${humanBytes(group.sizeBytes)} each · tap a copy to make it the keeper",
+                "${group.victims.size + 1} copies · ${humanBytes(group.sizeBytes)} each · tap a copy to make it the keeper · tap the thumbnail for details",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.SemiBold,
             )
             val allCopies = listOf(group.keeper) + group.victims
             allCopies.forEach { f ->
-                CopyRow(file = f, isCurrent = f.id == group.keeper.id, onPick = { onPick(f.id) })
+                CopyRow(
+                    file = f,
+                    isCurrent = f.id == group.keeper.id,
+                    onPick = { onPick(f.id) },
+                    onShowDetails = { onShowDetails(f) },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun CopyRow(file: MediaFileEntity, isCurrent: Boolean, onPick: () -> Unit) {
+private fun CopyRow(
+    file: MediaFileEntity,
+    isCurrent: Boolean,
+    onPick: () -> Unit,
+    onShowDetails: () -> Unit,
+) {
     val ctx = LocalContext.current
     val req = ImageRequest.Builder(ctx)
         .data(file.uri.toUri())
@@ -140,7 +164,8 @@ private fun CopyRow(file: MediaFileEntity, isCurrent: Boolean, onPick: () -> Uni
                     if (isCurrent) 2.dp else 1.dp,
                     if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                     RoundedCornerShape(6.dp),
-                ),
+                )
+                .clickable { onShowDetails() },
         )
         Text(
             file.fullPath,

@@ -92,6 +92,7 @@ fun DuplicatesScreen(viewModel: MainViewModel, nav: NavController) {
     }
 
     var overrideTarget by remember { mutableStateOf<KeeperGroup?>(null) }
+    var detailsTarget by remember { mutableStateOf<MediaFileEntity?>(null) }
 
     val groups = plan?.groups.orEmpty()
     val toDeleteCount = plan?.toDelete?.size ?: 0
@@ -168,6 +169,7 @@ fun DuplicatesScreen(viewModel: MainViewModel, nav: NavController) {
             splitRatio = splitRatio,
             onSplitChange = viewModel::setSplitRatio,
             onRandomBadgeTap = { overrideTarget = it },
+            onFileTap = { detailsTarget = it },
         )
     }
 
@@ -181,6 +183,10 @@ fun DuplicatesScreen(viewModel: MainViewModel, nav: NavController) {
             onDismiss = { overrideTarget = null },
         )
     }
+
+    detailsTarget?.let { file ->
+        FileDetailsDialog(file = file, onDismiss = { detailsTarget = null })
+    }
 }
 
 @Composable
@@ -190,6 +196,7 @@ private fun SplitView(
     splitRatio: Float,
     onSplitChange: (Float) -> Unit,
     onRandomBadgeTap: (KeeperGroup) -> Unit,
+    onFileTap: (MediaFileEntity) -> Unit,
 ) {
     var containerHeightPx by remember { mutableStateOf(1) }
 
@@ -218,6 +225,7 @@ private fun SplitView(
         VictimsPanel(
             groups = groups,
             state = topState,
+            onFileTap = onFileTap,
             modifier = Modifier.fillMaxWidth().weight(splitRatio),
         )
         DragHandle(
@@ -229,6 +237,7 @@ private fun SplitView(
             groups = groups,
             state = bottomState,
             onRandomBadgeTap = onRandomBadgeTap,
+            onFileTap = onFileTap,
             modifier = Modifier.fillMaxWidth().weight(1f - splitRatio),
         )
     }
@@ -238,6 +247,7 @@ private fun SplitView(
 private fun VictimsPanel(
     groups: List<KeeperGroup>,
     state: LazyListState,
+    onFileTap: (MediaFileEntity) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -247,13 +257,13 @@ private fun VictimsPanel(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(groups, key = { "v-" + it.md5 }) { group ->
-            VictimsRow(group)
+            VictimsRow(group, onFileTap)
         }
     }
 }
 
 @Composable
-private fun VictimsRow(group: KeeperGroup) {
+private fun VictimsRow(group: KeeperGroup, onFileTap: (MediaFileEntity) -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -273,7 +283,7 @@ private fun VictimsRow(group: KeeperGroup) {
                 )
             } else {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(group.victims, key = { it.id }) { f -> VictimThumb(f) }
+                    items(group.victims, key = { it.id }) { f -> VictimThumb(f, onFileTap) }
                 }
             }
         }
@@ -281,7 +291,7 @@ private fun VictimsRow(group: KeeperGroup) {
 }
 
 @Composable
-private fun VictimThumb(file: MediaFileEntity) {
+private fun VictimThumb(file: MediaFileEntity, onTap: (MediaFileEntity) -> Unit) {
     val ctx = LocalContext.current
     val req = ImageRequest.Builder(ctx)
         .data(file.uri.toUri())
@@ -290,7 +300,9 @@ private fun VictimThumb(file: MediaFileEntity) {
         .build()
     Column(
         horizontalAlignment = Alignment.Start,
-        modifier = Modifier.width(120.dp),
+        modifier = Modifier
+            .width(120.dp)
+            .clickable { onTap(file) },
     ) {
         AsyncImage(
             model = req,
@@ -304,8 +316,9 @@ private fun VictimThumb(file: MediaFileEntity) {
             file.fullPath,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.error,
+            fontFamily = FontFamily.Monospace,
             fontSize = 10.sp,
-            maxLines = 2,
+            maxLines = 3,
             modifier = Modifier.padding(top = 4.dp),
         )
     }
@@ -316,6 +329,7 @@ private fun KeepersPanel(
     groups: List<KeeperGroup>,
     state: LazyListState,
     onRandomBadgeTap: (KeeperGroup) -> Unit,
+    onFileTap: (MediaFileEntity) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -325,13 +339,17 @@ private fun KeepersPanel(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(groups, key = { "k-" + it.md5 }) { group ->
-            KeeperRow(group, onRandomBadgeTap)
+            KeeperRow(group, onRandomBadgeTap, onFileTap)
         }
     }
 }
 
 @Composable
-private fun KeeperRow(group: KeeperGroup, onRandomBadgeTap: (KeeperGroup) -> Unit) {
+private fun KeeperRow(
+    group: KeeperGroup,
+    onRandomBadgeTap: (KeeperGroup) -> Unit,
+    onFileTap: (MediaFileEntity) -> Unit,
+) {
     val ctx = LocalContext.current
     val req = ImageRequest.Builder(ctx)
         .data(group.keeper.uri.toUri())
@@ -339,7 +357,9 @@ private fun KeeperRow(group: KeeperGroup, onRandomBadgeTap: (KeeperGroup) -> Uni
         .crossfade(true)
         .build()
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onFileTap(group.keeper) },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Row(
@@ -362,7 +382,7 @@ private fun KeeperRow(group: KeeperGroup, onRandomBadgeTap: (KeeperGroup) -> Uni
                     color = MaterialTheme.colorScheme.onSurface,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp,
-                    maxLines = 2,
+                    maxLines = 4,
                 )
             }
             ReasonBadge(group.reason, onClick = if (group.reason == KeeperReason.RANDOM) {
