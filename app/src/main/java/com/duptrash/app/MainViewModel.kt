@@ -49,16 +49,29 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         )
 
     val splitRatio: StateFlow<Float> get() = getApplication<DupTrashApp>().uiPrefs.splitRatio
+    val customFolderUris: StateFlow<Set<String>> get() = getApplication<DupTrashApp>().uiPrefs.customFolderUris
 
     fun setSplitRatio(value: Float) {
         getApplication<DupTrashApp>().uiPrefs.setSplitRatio(value)
+    }
+
+    fun addCustomFolder(uri: String) {
+        getApplication<DupTrashApp>().uiPrefs.addCustomFolder(uri)
+    }
+
+    fun removeCustomFolder(uri: String) {
+        getApplication<DupTrashApp>().uiPrefs.removeCustomFolder(uri)
     }
 
     fun startScan() {
         if (_busy.value) return
         _busy.value = true
         viewModelScope.launch {
-            try { mediaScanner.scan() } finally { _busy.value = false }
+            try {
+                mediaScanner.scan(getApplication<DupTrashApp>().uiPrefs.customFolderUris.value)
+            } finally {
+                _busy.value = false
+            }
         }
     }
 

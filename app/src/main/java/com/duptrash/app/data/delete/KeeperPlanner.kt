@@ -70,6 +70,10 @@ object KeeperPlanner {
         // Candidates: prefer unmatched copies; if every copy matched a regex, fall back to all copies.
         val candidates = if (unmatched.isNotEmpty()) unmatched else group.files
 
+        // Name-series heuristic: same folder, names like foo.jpg / foo(1).jpg / foo(2).jpg.
+        // Prefer the lowest-numbered copy (treating the unnumbered original as N=0).
+        pickByCanonicalName(candidates)?.let { return it to KeeperReason.NAME }
+
         // No prior keepers to compare against — pick canonically (shortest full path) and tag RANDOM.
         if (seenKeepers.isEmpty()) {
             return candidates.minBy { it.fullPath.length } to KeeperReason.RANDOM
@@ -94,4 +98,19 @@ object KeeperPlanner {
         while (i < n && a[i] == b[i]) i++
         return i
     }
+
+    private fun pickByCanonicalName(candidates: List<MediaFileEntity>): MediaFileEntity? {
+        val series = candidates.groupBy { it.relativePath to canonicalBaseName(it.displayName) }
+        val biggest = series.maxByOrNull { it.value.size } ?: return null
+        if (biggest.value.size < 2) return null
+        return biggest.value.minByOrNull { copyNumber(it.displayName) }
+    }
+
+    private val NUMBERED_RE = Regex("""^(.*?)\((\d+)\)(\.[^.]+)?$""")
+
+    private fun canonicalBaseName(name: String): String =
+        NUMBERED_RE.matchEntire(name)?.let { it.groupValues[1] + it.groupValues[3] } ?: name
+
+    private fun copyNumber(name: String): Int =
+        NUMBERED_RE.matchEntire(name)?.groupValues?.get(2)?.toIntOrNull() ?: 0
 }

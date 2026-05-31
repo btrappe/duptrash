@@ -11,6 +11,7 @@ object Routes {
     const val DUPLICATES = "duplicates"
     const val PATTERNS = "patterns"
     const val RANDOM_PICKS = "random-picks"
+    const val FOLDERS = "folders"
 }
 
 @Composable
@@ -21,5 +22,6 @@ fun AppNavigation(viewModel: MainViewModel) {
         composable(Routes.DUPLICATES) { DuplicatesScreen(viewModel, nav) }
         composable(Routes.PATTERNS) { PatternsScreen(viewModel, nav) }
         composable(Routes.RANDOM_PICKS) { RandomPicksScreen(viewModel, nav) }
+        composable(Routes.FOLDERS) { FoldersScreen(viewModel, nav) }
     }
 }

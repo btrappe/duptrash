@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Numbers
 import androidx.compose.material.icons.filled.PanTool
 import androidx.compose.material.icons.filled.QuestionMark
 import androidx.compose.material.icons.filled.Tag
@@ -121,16 +122,32 @@ fun DuplicatesScreen(viewModel: MainViewModel, nav: NavController) {
             )
         },
         bottomBar = {
-            Box(Modifier.padding(12.dp)) {
+            val safCount = plan?.toDelete?.count { it.id < 0L } ?: 0
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (safCount > 0) {
+                    Text(
+                        "$safCount file(s) from extra folders will be deleted PERMANENTLY (SAF has no trash).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
                 Button(
                     onClick = {
-                        val uris = plan?.toDelete?.map { it.uri.toUri() }.orEmpty()
-                        val sender = TrashRequestLauncher.buildTrashRequest(ctx.contentResolver, uris)
+                        val all = plan?.toDelete?.map { it.uri.toUri() }.orEmpty()
+                        val (mediaStoreUris, safUris) = TrashRequestLauncher.partition(all)
+                        // Delete SAF entries inline (permanent — SAF has no trash).
+                        if (safUris.isNotEmpty()) {
+                            TrashRequestLauncher.deleteSafFiles(ctx.contentResolver, safUris)
+                        }
+                        val sender = TrashRequestLauncher.buildTrashRequest(ctx.contentResolver, mediaStoreUris)
                         if (sender != null) {
                             trashLauncher.launch(IntentSenderRequest.Builder(sender).build())
+                        } else if (safUris.isNotEmpty()) {
+                            // No system dialog needed — just refresh.
+                            viewModel.onTrashRequestResult(true)
                         }
                     },
-                    enabled = toDeleteCount > 0 && TrashRequestLauncher.isSupported(),
+                    enabled = toDeleteCount > 0,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                 ) {
                     Text("Move $toDeleteCount file(s) to trash — reclaim ${humanBytes(reclaim)}")
@@ -359,6 +376,7 @@ private fun KeeperRow(group: KeeperGroup, onRandomBadgeTap: (KeeperGroup) -> Uni
 private fun ReasonBadge(reason: KeeperReason, onClick: (() -> Unit)?) {
     val (color, label, icon) = when (reason) {
         KeeperReason.REGEX -> Triple(Color(0xFF00A884), "regex", Icons.Default.Check)
+        KeeperReason.NAME -> Triple(Color(0xFFBA68C8), "name", Icons.Default.Numbers)
         KeeperReason.SIMILARITY -> Triple(Color(0xFF4FC3F7), "similar", Icons.Default.Tag)
         KeeperReason.RANDOM -> Triple(Color(0xFFFFB830), "random", Icons.Default.QuestionMark)
         KeeperReason.USER_OVERRIDE -> Triple(Color(0xFF26C6DA), "yours", Icons.Default.PanTool)

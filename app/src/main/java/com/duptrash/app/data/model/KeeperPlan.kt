@@ -2,7 +2,7 @@ package com.duptrash.app.data.model
 
 import com.duptrash.app.data.db.MediaFileEntity
 
-enum class KeeperReason { REGEX, SIMILARITY, RANDOM, USER_OVERRIDE }
+enum class KeeperReason { REGEX, NAME, SIMILARITY, RANDOM, USER_OVERRIDE }
 
 data class KeeperGroup(
     val md5: String,
