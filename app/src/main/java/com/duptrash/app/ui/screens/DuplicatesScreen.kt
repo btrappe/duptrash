@@ -1,5 +1,7 @@
 package com.duptrash.app.ui.screens
 
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -85,14 +87,77 @@ fun DuplicatesScreen(viewModel: MainViewModel, nav: NavController) {
     val plan by viewModel.plan.collectAsState()
     val splitRatio by viewModel.splitRatio.collectAsState()
 
+    var overrideTarget by remember { mutableStateOf<KeeperGroup?>(null) }
+    var detailsTarget by remember { mutableStateOf<MediaFileEntity?>(null) }
+
+    // Queue of MediaStore URI batches pending user confirmation.
+    var pendingBatches by remember { mutableStateOf<List<List<android.net.Uri>>>(emptyList()) }
+    var totalBatches by remember { mutableStateOf(0) }
+    var batchesDone by remember { mutableStateOf(0) }
+
     val trashLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
-        viewModel.onTrashRequestResult(result.resultCode == android.app.Activity.RESULT_OK)
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            batchesDone += 1
+            val remaining = pendingBatches.drop(1)
+            pendingBatches = remaining          // LaunchedEffect below fires next batch
+            if (remaining.isEmpty()) {
+                viewModel.onTrashRequestResult(true)
+                val done = batchesDone
+                Toast.makeText(
+                    ctx,
+                    if (totalBatches == 1) "Moved to trash." else "Trashed $done batch(es).",
+                    Toast.LENGTH_SHORT,
+                ).show()
+                totalBatches = 0
+                batchesDone = 0
+            }
+        } else {
+            val partialDone = batchesDone
+            val partialTotal = totalBatches
+            pendingBatches = emptyList()
+            totalBatches = 0
+            batchesDone = 0
+            if (partialDone > 0) {
+                viewModel.onTrashRequestResult(true)
+                Toast.makeText(
+                    ctx,
+                    "Stopped after $partialDone of $partialTotal batch(es). Re-run to continue.",
+                    Toast.LENGTH_LONG,
+                ).show()
+            } else {
+                Toast.makeText(ctx, "Trash cancelled.", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
-    var overrideTarget by remember { mutableStateOf<KeeperGroup?>(null) }
-    var detailsTarget by remember { mutableStateOf<MediaFileEntity?>(null) }
+    // Whenever the head of pendingBatches changes (initial enqueue OR after a
+    // successful confirm), launch the next system trash dialog. Empty list = no-op.
+    LaunchedEffect(pendingBatches) {
+        val head = pendingBatches.firstOrNull() ?: return@LaunchedEffect
+        try {
+            val sender = TrashRequestLauncher.buildTrashRequest(ctx.contentResolver, head)
+            if (sender != null) {
+                trashLauncher.launch(IntentSenderRequest.Builder(sender).build())
+            } else {
+                Toast.makeText(ctx, "Empty trash request — nothing to do.", Toast.LENGTH_SHORT).show()
+                pendingBatches = emptyList()
+                totalBatches = 0
+                batchesDone = 0
+            }
+        } catch (t: Throwable) {
+            Log.e("DuplicatesScreen", "Trash batch of ${head.size} failed", t)
+            Toast.makeText(
+                ctx,
+                "Trash request failed: ${t.javaClass.simpleName}: ${t.message ?: "(no message)"}",
+                Toast.LENGTH_LONG,
+            ).show()
+            pendingBatches = emptyList()
+            totalBatches = 0
+            batchesDone = 0
+        }
+    }
 
     val groups = plan?.groups.orEmpty()
     val toDeleteCount = plan?.toDelete?.size ?: 0
@@ -124,6 +189,7 @@ fun DuplicatesScreen(viewModel: MainViewModel, nav: NavController) {
         },
         bottomBar = {
             val safCount = plan?.toDelete?.count { it.id < 0L } ?: 0
+            val batchInProgress = pendingBatches.isNotEmpty()
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (safCount > 0) {
                     Text(
@@ -132,23 +198,55 @@ fun DuplicatesScreen(viewModel: MainViewModel, nav: NavController) {
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
+                if (batchInProgress) {
+                    Text(
+                        "Trashing batch ${batchesDone + 1} of $totalBatches — confirm each system dialog.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 Button(
                     onClick = {
-                        val all = plan?.toDelete?.map { it.uri.toUri() }.orEmpty()
-                        val (mediaStoreUris, safUris) = TrashRequestLauncher.partition(all)
-                        // Delete SAF entries inline (permanent — SAF has no trash).
-                        if (safUris.isNotEmpty()) {
-                            TrashRequestLauncher.deleteSafFiles(ctx.contentResolver, safUris)
-                        }
-                        val sender = TrashRequestLauncher.buildTrashRequest(ctx.contentResolver, mediaStoreUris)
-                        if (sender != null) {
-                            trashLauncher.launch(IntentSenderRequest.Builder(sender).build())
-                        } else if (safUris.isNotEmpty()) {
-                            // No system dialog needed — just refresh.
-                            viewModel.onTrashRequestResult(true)
+                        try {
+                            val all = plan?.toDelete?.map { it.uri.toUri() }.orEmpty()
+                            val (mediaStoreUris, safUris) = TrashRequestLauncher.partition(all)
+                            // Delete SAF entries inline (permanent — SAF has no trash).
+                            if (safUris.isNotEmpty()) {
+                                val n = TrashRequestLauncher.deleteSafFiles(ctx.contentResolver, safUris)
+                                if (n < safUris.size) {
+                                    Toast.makeText(
+                                        ctx,
+                                        "Deleted $n of ${safUris.size} SAF files (some failed).",
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                }
+                            }
+                            val batches = TrashRequestLauncher.batch(mediaStoreUris)
+                            if (batches.isEmpty()) {
+                                // SAF-only deletion — nothing for MediaStore dialog. Refresh now.
+                                if (safUris.isNotEmpty()) viewModel.onTrashRequestResult(true)
+                            } else {
+                                totalBatches = batches.size
+                                batchesDone = 0
+                                pendingBatches = batches
+                                if (batches.size > 1) {
+                                    Toast.makeText(
+                                        ctx,
+                                        "Splitting into ${batches.size} batches of up to ${TrashRequestLauncher.BATCH_SIZE} — confirm each.",
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                }
+                            }
+                        } catch (t: Throwable) {
+                            Log.e("DuplicatesScreen", "Trash kick-off failed", t)
+                            Toast.makeText(
+                                ctx,
+                                "Trash failed: ${t.javaClass.simpleName}: ${t.message ?: "(no message)"}",
+                                Toast.LENGTH_LONG,
+                            ).show()
                         }
                     },
-                    enabled = toDeleteCount > 0,
+                    enabled = toDeleteCount > 0 && !batchInProgress,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                 ) {
                     Text("Move $toDeleteCount file(s) to trash — reclaim ${humanBytes(reclaim)}")

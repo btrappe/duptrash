@@ -12,6 +12,16 @@ object TrashRequestLauncher {
 
     private const val TAG = "TrashRequest"
 
+    /**
+     * Max URIs per single createTrashRequest call. Android's Binder IPC
+     * caps a single transaction at ~1 MB; with content URI strings
+     * averaging 50 bytes the practical safe ceiling is a few thousand,
+     * but vendor system dialogs (Samsung, Xiaomi) often choke earlier
+     * and silently dismiss themselves. 500 stays well clear and only
+     * costs the user a few extra confirm dialogs on huge deletes.
+     */
+    const val BATCH_SIZE = 500
+
     fun isSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
 
     fun partition(uris: List<Uri>): Pair<List<Uri>, List<Uri>> {
@@ -22,6 +32,10 @@ object TrashRequestLauncher {
         }
         return mediaStore to saf
     }
+
+    /** Splits the MediaStore URIs into Binder-safe batches. */
+    fun batch(mediaStoreUris: List<Uri>): List<List<Uri>> =
+        if (mediaStoreUris.isEmpty()) emptyList() else mediaStoreUris.chunked(BATCH_SIZE)
 
     fun buildTrashRequest(resolver: ContentResolver, mediaStoreUris: List<Uri>): IntentSender? {
         if (!isSupported() || mediaStoreUris.isEmpty()) return null
