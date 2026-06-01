@@ -58,13 +58,40 @@ import com.duptrash.app.ui.humanBytes
 @Composable
 fun RandomPicksScreen(viewModel: MainViewModel, nav: NavController) {
     val plan by viewModel.plan.collectAsState()
-    val randomGroups = plan?.groups.orEmpty().filter { it.reason == KeeperReason.RANDOM }
     var detailsTarget by remember { mutableStateOf<MediaFileEntity?>(null) }
+
+    // Pin the set of md5s that were RANDOM when this screen opened so that
+    // tapping a copy (which flips the group's reason to USER_OVERRIDE)
+    // doesn't make the card vanish. The user stays oriented and can see
+    // their swap take effect immediately.
+    val trackedMd5s = remember { mutableStateOf<Set<String>?>(null) }
+    if (trackedMd5s.value == null && plan != null) {
+        trackedMd5s.value = plan!!.groups
+            .filter { it.reason == KeeperReason.RANDOM }
+            .map { it.md5 }
+            .toSet()
+    }
+
+    val tracked = trackedMd5s.value ?: emptySet()
+    val visibleGroups = plan?.groups.orEmpty().filter { it.md5 in tracked }
+    val stillRandom = visibleGroups.count { it.reason == KeeperReason.RANDOM }
+    val resolved = visibleGroups.count { it.reason == KeeperReason.USER_OVERRIDE }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Random picks (${randomGroups.size})") },
+                title = {
+                    Column {
+                        Text("Random picks (${visibleGroups.size})")
+                        if (resolved > 0) {
+                            Text(
+                                "$stillRandom still random · $resolved resolved",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { nav.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -73,7 +100,7 @@ fun RandomPicksScreen(viewModel: MainViewModel, nav: NavController) {
             )
         }
     ) { padding ->
-        if (randomGroups.isEmpty()) {
+        if (visibleGroups.isEmpty()) {
             Column(
                 Modifier.fillMaxSize().padding(padding).padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -87,7 +114,7 @@ fun RandomPicksScreen(viewModel: MainViewModel, nav: NavController) {
             contentPadding = PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(randomGroups, key = { it.md5 }) { group ->
+            items(visibleGroups, key = { it.md5 }) { group ->
                 RandomPickCard(
                     group = group,
                     onPick = { fileId -> viewModel.setKeeperOverride(group.md5, fileId) },
@@ -108,15 +135,19 @@ private fun RandomPickCard(
     onPick: (Long) -> Unit,
     onShowDetails: (MediaFileEntity) -> Unit,
 ) {
+    val isResolved = group.reason == KeeperReason.USER_OVERRIDE
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                "${group.victims.size + 1} copies · ${humanBytes(group.sizeBytes)} each · tap a copy to make it the keeper · tap the thumbnail for details",
+                if (isResolved)
+                    "✓ Resolved · keeper picked by you · tap another copy to change your mind"
+                else
+                    "${group.victims.size + 1} copies · ${humanBytes(group.sizeBytes)} each · tap a copy to make it the keeper · tap the thumbnail for details",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (isResolved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.SemiBold,
             )
             val allCopies = listOf(group.keeper) + group.victims
