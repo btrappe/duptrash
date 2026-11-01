@@ -1,12 +1,14 @@
 package com.duptrash.app.data.delete
 
 import android.content.ContentResolver
+import android.content.ContentUris
 import android.content.IntentSender
 import android.net.Uri
 import android.os.Build
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.util.Log
+import com.duptrash.app.data.db.MediaFileEntity
 
 object TrashRequestLauncher {
 
@@ -31,6 +33,23 @@ object TrashRequestLauncher {
             if (u.authority == MediaStore.AUTHORITY) mediaStore += u else saf += u
         }
         return mediaStore to saf
+    }
+
+    /**
+     * createTrashRequest rejects generic Files URIs (content://media/external/file/ID)
+     * with IllegalArgumentException — it only accepts Images/Video/Audio item URIs.
+     * Rewrite scanner-stored Files URIs to the typed collection; SAF URIs pass through.
+     */
+    fun trashableUri(file: MediaFileEntity): Uri {
+        val uri = Uri.parse(file.uri)
+        if (uri.authority != MediaStore.AUTHORITY || file.id < 0L) return uri
+        val volume = uri.pathSegments.firstOrNull() ?: MediaStore.VOLUME_EXTERNAL
+        val collection = when (file.mediaType) {
+            MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE -> MediaStore.Images.Media.getContentUri(volume)
+            MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO -> MediaStore.Video.Media.getContentUri(volume)
+            else -> return uri
+        }
+        return ContentUris.withAppendedId(collection, file.id)
     }
 
     /** Splits the MediaStore URIs into Binder-safe batches. */

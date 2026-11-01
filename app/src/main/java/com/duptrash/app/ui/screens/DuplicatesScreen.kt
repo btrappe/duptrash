@@ -208,7 +208,7 @@ fun DuplicatesScreen(viewModel: MainViewModel, nav: NavController) {
                 Button(
                     onClick = {
                         try {
-                            val all = plan?.toDelete?.map { it.uri.toUri() }.orEmpty()
+                            val all = plan?.toDelete?.map { TrashRequestLauncher.trashableUri(it) }.orEmpty()
                             val (mediaStoreUris, safUris) = TrashRequestLauncher.partition(all)
                             // Delete SAF entries inline (permanent — SAF has no trash).
                             if (safUris.isNotEmpty()) {
